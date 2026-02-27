@@ -2,11 +2,19 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 sqlalchemy>=2.0.30
-alembic>=1.13.0  # si vous utilisez Alembic
+alembic>=1.13.0
 
 # Database driver
-psycopg2-binary>=2.9.9  # ou asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
 
 # Autres dépendances
 pydantic>=2.7.0
 python-dotenv>=1.0.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.9
+
+# OAuth
+python-jose[all]>=3.3.0  # inclut tout le nécessaire pour JWT
