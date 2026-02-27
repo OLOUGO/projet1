@@ -11,6 +11,26 @@ from datetime import timedelta
 import models
 from auth import get_current_active_user
 from database import engine, SessionLocal, get_db
+
+import sys
+import subprocess
+
+print("🔍 VÉRIFICATION DES PACKAGES INSTALLÉS")
+print("=" * 50)
+
+# Vérifier si jinja2 est installé
+try:
+    import jinja2
+    print(f"✅ jinja2 est installé (version: {jinja2.__version__})")
+except ImportError:
+    print("❌ jinja2 N'EST PAS installé")
+
+print("\n📦 Liste complète des packages:")
+result = subprocess.run(['pip', 'freeze'], capture_output=True, text=True)
+print(result.stdout)
+print("=" * 50)
+
+
 from auth import (
     authenticate_user, create_access_token, get_current_active_user,
     get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, ALGORITHM

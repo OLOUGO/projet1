@@ -1,28 +1,11 @@
-import sys
-import subprocess
-
-print("🔍 VÉRIFICATION DES PACKAGES INSTALLÉS")
-print("=" * 50)
-
-# Vérifier si jinja2 est installé
-try:
-    import jinja2
-    print(f"✅ jinja2 est installé (version: {jinja2.__version__})")
-except ImportError:
-    print("❌ jinja2 N'EST PAS installé")
-
-print("\n📦 Liste complète des packages:")
-result = subprocess.run(['pip', 'freeze'], capture_output=True, text=True)
-print(result.stdout)
-print("=" * 50)
-
-# Votre code existant...
-from fastapi import FastAPI
-from fastapi.templating import Jinja2Templates
-
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
-
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+fastapi==0.115.5
+uvicorn[standard]==0.30.6
+sqlalchemy==2.0.36
+jinja2==3.1.4
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.12
+psycopg2-binary==2.9.10
+alembic==1.13.3
+pydantic==2.9.2
+python-dotenv==1.0.1
