@@ -1,20 +1,23 @@
-# Core
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-sqlalchemy>=2.0.30
-alembic>=1.13.0
+# FastAPI
+fastapi==0.115.5
+uvicorn[standard]==0.30.6
 
-# Database driver
-psycopg2-binary>=2.9.9
+# Base de données
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+alembic==1.13.3
 
-# Autres dépendances
-pydantic>=2.7.0
-python-dotenv>=1.0.0
+# Validation
+pydantic==2.9.2
+pydantic-settings==2.4.0
 
-# Authentication
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-python-multipart>=0.0.9
+# Authentification
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.12
 
-# OAuth
-python-jose[all]>=3.3.0  # inclut tout le nécessaire pour JWT
+# Templates (AJOUT IMPORTANT)
+jinja2==3.1.4
+
+# Utilitaires
+python-dotenv==1.0.1
