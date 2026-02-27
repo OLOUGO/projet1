@@ -1,23 +1,28 @@
-# FastAPI
-fastapi==0.115.5
-uvicorn[standard]==0.30.6
+import sys
+import subprocess
 
-# Base de données
-sqlalchemy==2.0.36
-psycopg2-binary==2.9.10
-alembic==1.13.3
+print("🔍 VÉRIFICATION DES PACKAGES INSTALLÉS")
+print("=" * 50)
 
-# Validation
-pydantic==2.9.2
-pydantic-settings==2.4.0
+# Vérifier si jinja2 est installé
+try:
+    import jinja2
+    print(f"✅ jinja2 est installé (version: {jinja2.__version__})")
+except ImportError:
+    print("❌ jinja2 N'EST PAS installé")
 
-# Authentification
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.12
+print("\n📦 Liste complète des packages:")
+result = subprocess.run(['pip', 'freeze'], capture_output=True, text=True)
+print(result.stdout)
+print("=" * 50)
 
-# Templates (AJOUT IMPORTANT)
-jinja2==3.1.4
+# Votre code existant...
+from fastapi import FastAPI
+from fastapi.templating import Jinja2Templates
 
-# Utilitaires
-python-dotenv==1.0.1
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
