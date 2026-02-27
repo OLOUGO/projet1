@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Modifier un Prix{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-warning text-white">
+                <h4><i class="fas fa-edit"></i> Modifier le prix N°{{ price.id }}</h4>
+            </div>
+            <div class="card-body">
+                {% if errors %}
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-triangle"></i> Erreurs de validation :</h6>
+                    <ul class="mb-0">
+                        {% for error in errors %}
+                        <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <form method="post" id="priceForm" onsubmit="return validateForm()">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="product_id" class="form-label">
+                                <i class="fas fa-box"></i> Produit <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-control" id="product_id" name="product_id" required>
+                                <option value="" disabled>-- Choisir un produit --</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}" 
+                                    {% if product.id == price.product_id %}selected{% endif %}>
+                                    {{ product.name }} ({{ product.category }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback" id="productError">
+                                Veuillez sélectionner un produit
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="zone_id" class="form-label">
+                                <i class="fas fa-map-marker-alt"></i> Zone <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-control" id="zone_id" name="zone_id" required>
+                                <option value="" disabled>-- Choisir une zone --</option>
+                                {% for zone in zones %}
+                                <option value="{{ zone.id }}"
+                                    {% if zone.id == price.zone_id %}selected{% endif %}>
+                                    {{ zone.name }} ({{ zone.city }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback" id="zoneError">
+                                Veuillez sélectionner une zone
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="price" class="form-label">
+                                <i class="fas fa-money-bill-wave"></i> Prix (FCFA) <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" step="1" min="1" class="form-control" 
+                                   id="price" name="price" 
+                                   value="{{ price.price }}"
+                                   placeholder="Ex: 1500" required>
+                            <div class="form-text">Prix en FCFA (nombre entier)</div>
+                            <div class="invalid-feedback" id="priceError">
+                                Le prix est requis et doit être supérieur à 0
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="date" class="form-label">
+                                <i class="fas fa-calendar"></i> Date
+                            </label>
+                            <input type="datetime-local" class="form-control" 
+                                   id="date" name="date" 
+                                   value="{{ price.date.strftime('%Y-%m-%dT%H:%M') if price.date else '' }}">
+                            <div class="form-text">Laissez vide pour la date actuelle</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">
+                            <i class="fas fa-sticky-note"></i> Notes
+                        </label>
+                        <textarea class="form-control" id="notes" name="notes" 
+                                  rows="2" placeholder="Informations complémentaires...">{{ price.notes or '' }}</textarea>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="/prices" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Annuler
+                        </a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save"></i> Mettre à jour
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function validateForm() {
+    let isValid = true;
+    
+    // Réinitialiser
+    document.querySelectorAll('.form-control').forEach(f => f.classList.remove('is-invalid'));
+    
+    // Validation du produit
+    const product = document.getElementById('product_id');
+    if (!product.value) {
+        product.classList.add('is-invalid');
+        document.getElementById('productError').style.display = 'block';
+        isValid = false;
+    }
+    
+    // Validation de la zone
+    const zone = document.getElementById('zone_id');
+    if (!zone.value) {
+        zone.classList.add('is-invalid');
+        document.getElementById('zoneError').style.display = 'block';
+        isValid = false;
+    }
+    
+    // Validation du prix
+    const price = document.getElementById('price');
+    if (!price.value || parseFloat(price.value) <= 0) {
+        price.classList.add('is-invalid');
+        document.getElementById('priceError').style.display = 'block';
+        isValid = false;
+    } else if (!Number.isInteger(parseFloat(price.value))) {
+        price.classList.add('is-invalid');
+        document.getElementById('priceError').innerText = 'Le prix doit être un nombre entier';
+        document.getElementById('priceError').style.display = 'block';
+        isValid = false;
+    }
+    
+    if (!isValid) {
+        alert('❌ Veuillez remplir tous les champs obligatoires correctement');
+    }
+    
+    return isValid;
+}
+
+// Validation en temps réel
+document.getElementById('product_id').addEventListener('change', function() {
+    if (this.value) this.classList.remove('is-invalid');
+});
+
+document.getElementById('zone_id').addEventListener('change', function() {
+    if (this.value) this.classList.remove('is-invalid');
+});
+
+document.getElementById('price').addEventListener('input', function() {
+    if (this.value && parseFloat(this.value) > 0 && Number.isInteger(parseFloat(this.value))) {
+        this.classList.remove('is-invalid');
+    }
+});
+</script>
+{% endblock %}

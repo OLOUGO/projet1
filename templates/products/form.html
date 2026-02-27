@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Ajouter un Produit{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4><i class="fas fa-plus-circle"></i> Ajouter un produit</h4>
+            </div>
+            <div class="card-body">
+                <!-- Messages d'erreur du serveur -->
+                {% if errors %}
+                <div class="alert alert-danger">
+                    <ul class="mb-0">
+                        {% for error in errors %}
+                        <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <form method="post" id="productForm" onsubmit="return validateForm()">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nom du produit <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               value="{{ form.name if form else '' }}" required>
+                        <div class="invalid-feedback" id="nameError">
+                            Le nom du produit est requis
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Catégorie <span class="text-danger">*</span></label>
+                        <select class="form-control" id="category" name="category" required>
+                            <option value="" disabled selected>-- Sélectionnez une catégorie --</option>
+                            <option value="Céréale" {% if form and form.category == 'Céréale' %}selected{% endif %}>Céréale</option>
+                            <option value="Légume" {% if form and form.category == 'Légume' %}selected{% endif %}>Légume</option>
+                            <option value="Fruit" {% if form and form.category == 'Fruit' %}selected{% endif %}>Fruit</option>
+                            <option value="Tubercule" {% if form and form.category == 'Tubercule' %}selected{% endif %}>Tubercule</option>
+                            <option value="Légumineuse" {% if form and form.category == 'Légumineuse' %}selected{% endif %}>Légumineuse</option>
+                        </select>
+                        <div class="invalid-feedback" id="categoryError">
+                            La catégorie est requise
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="unit" class="form-label">Unité de mesure <span class="text-danger">*</span></label>
+                        <select class="form-control" id="unit" name="unit" required>
+                            <option value="" disabled selected>-- Sélectionnez une unité --</option>
+                            <option value="kg" {% if form and form.unit == 'kg' %}selected{% endif %}>Kilogramme (kg)</option>
+                            <option value="sac" {% if form and form.unit == 'sac' %}selected{% endif %}>Sac</option>
+                            <option value="tonne" {% if form and form.unit == 'tonne' %}selected{% endif %}>Tonne</option>
+                        </select>
+                        <div class="invalid-feedback" id="unitError">
+                            L'unité de mesure est requise
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="description" name="description" rows="3" required>{{ form.description if form else '' }}</textarea>
+                        <div class="invalid-feedback" id="descriptionError">
+                            La description est requise
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="/products" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Annuler
+                        </a>
+                        <button type="submit" class="btn btn-success" id="submitBtn">
+                            <i class="fas fa-save"></i> Enregistrer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function validateForm() {
+    let isValid = true;
+    
+    // Réinitialiser les classes d'erreur
+    document.querySelectorAll('.form-control').forEach(field => {
+        field.classList.remove('is-invalid');
+    });
+    
+    // Validation du nom
+    const name = document.getElementById('name');
+    if (!name.value.trim()) {
+        name.classList.add('is-invalid');
+        document.getElementById('nameError').style.display = 'block';
+        isValid = false;
+    } else if (name.value.trim().length < 2) {
+        name.classList.add('is-invalid');
+        document.getElementById('nameError').innerText = 'Le nom doit contenir au moins 2 caractères';
+        document.getElementById('nameError').style.display = 'block';
+        isValid = false;
+    }
+    
+    // Validation de la catégorie
+    const category = document.getElementById('category');
+    if (!category.value) {
+        category.classList.add('is-invalid');
+        document.getElementById('categoryError').style.display = 'block';
+        isValid = false;
+    }
+    
+    // Validation de l'unité
+    const unit = document.getElementById('unit');
+    if (!unit.value) {
+        unit.classList.add('is-invalid');
+        document.getElementById('unitError').style.display = 'block';
+        isValid = false;
+    }
+    
+    // Validation de la description
+    const description = document.getElementById('description');
+    if (!description.value.trim()) {
+        description.classList.add('is-invalid');
+        document.getElementById('descriptionError').style.display = 'block';
+        isValid = false;
+    } else if (description.value.trim().length < 5) {
+        description.classList.add('is-invalid');
+        document.getElementById('descriptionError').innerText = 'La description doit contenir au moins 5 caractères';
+        document.getElementById('descriptionError').style.display = 'block';
+        isValid = false;
+    }
+    
+    if (!isValid) {
+        alert('Veuillez remplir tous les champs obligatoires');
+    }
+    
+    return isValid;
+}
+
+// Validation en temps réel
+document.getElementById('name').addEventListener('input', function() {
+    if (this.value.trim()) this.classList.remove('is-invalid');
+});
+document.getElementById('category').addEventListener('change', function() {
+    if (this.value) this.classList.remove('is-invalid');
+});
+document.getElementById('unit').addEventListener('change', function() {
+    if (this.value) this.classList.remove('is-invalid');
+});
+document.getElementById('description').addEventListener('input', function() {
+    if (this.value.trim()) this.classList.remove('is-invalid');
+});
+</script>
+
+<style>
+.is-invalid {
+    border-color: #dc3545 !important;
+}
+.invalid-feedback {
+    display: none;
+    color: #dc3545;
+    font-size: 0.875em;
+    margin-top: 0.25rem;
+}
+.is-invalid ~ .invalid-feedback {
+    display: block;
+}
+.text-danger {
+    color: #dc3545;
+}
+</style>
+{% endblock %}

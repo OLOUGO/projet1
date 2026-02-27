@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Accueil - AgriSuivi Bénin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12 text-center">
+        <h1 class="display-4 text-success">
+            <i class="fas fa-chart-line"></i> Suivi des Stocks et Prix Agricoles
+        </h1>
+        <p class="lead">Plateforme de centralisation des données agricoles au Bénin</p>
+    </div>
+</div>
+
+<!-- Message de debug -->
+<div class="alert alert-info">
+    <h4>Debug Info</h4>
+    <p>Template chargé avec succès !</p>
+    <p>Stats: {{ stats }}</p>
+</div>
+
+<!-- Statistiques rapides -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-box"></i> Produits</h5>
+                <h2>{{ stats.products_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-map-marker-alt"></i> Zones</h5>
+                <h2>{{ stats.zones_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-warehouse"></i> Stocks</h5>
+                <h2>{{ stats.stocks_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-tag"></i> Prix</h5>
+                <h2>{{ stats.prices_count }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Derniers prix -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5><i class="fas fa-tag"></i> Derniers prix</h5>
+            </div>
+            <div class="card-body">
+                {% if latest_prices %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th>Zone</th>
+                            <th>Prix (FCFA)</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for price in latest_prices %}
+                        <tr>
+                            <td>{{ price.product.name }}</td>
+                            <td>{{ price.zone.name }}</td>
+                            <td>{{ price.price }}</td>
+                            <td>{{ price.date.strftime('%d/%m/%Y') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">Aucun prix enregistré</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Derniers stocks -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5><i class="fas fa-warehouse"></i> Derniers stocks</h5>
+            </div>
+            <div class="card-body">
+                {% if latest_stocks %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th>Zone</th>
+                            <th>Quantité</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stock in latest_stocks %}
+                        <tr>
+                            <td>{{ stock.product.name }}</td>
+                            <td>{{ stock.zone.name }}</td>
+                            <td>{{ stock.quantity }} {{ stock.product.unit }}</td>
+                            <td>{{ stock.date.strftime('%d/%m/%Y') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">Aucun stock enregistré</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

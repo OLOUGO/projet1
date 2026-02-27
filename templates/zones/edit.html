@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Modifier une Zone{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-warning text-white">
+                <h4><i class="fas fa-edit"></i> Modifier la zone</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nom de la zone *</label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               value="{{ zone.name }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="type" class="form-label">Type de zone</label>
+                        <select class="form-control" id="type" name="type">
+                            <option value="Marché" {% if zone.type == 'Marché' %}selected{% endif %}>Marché</option>
+                            <option value="Dépôt" {% if zone.type == 'Dépôt' %}selected{% endif %}>Dépôt / Entrepôt</option>
+                            <option value="Commune" {% if zone.type == 'Commune' %}selected{% endif %}>Commune</option>
+                            <option value="Arrondissement" {% if zone.type == 'Arrondissement' %}selected{% endif %}>Arrondissement</option>
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="department" class="form-label">Département</label>
+                            <select class="form-control" id="department" name="department">
+                                <option value="Alibori" {% if zone.department == 'Alibori' %}selected{% endif %}>Alibori</option>
+                                <option value="Atacora" {% if zone.department == 'Atacora' %}selected{% endif %}>Atacora</option>
+                                <option value="Atlantique" {% if zone.department == 'Atlantique' %}selected{% endif %}>Atlantique</option>
+                                <option value="Borgou" {% if zone.department == 'Borgou' %}selected{% endif %}>Borgou</option>
+                                <option value="Collines" {% if zone.department == 'Collines' %}selected{% endif %}>Collines</option>
+                                <option value="Couffo" {% if zone.department == 'Couffo' %}selected{% endif %}>Couffo</option>
+                                <option value="Donga" {% if zone.department == 'Donga' %}selected{% endif %}>Donga</option>
+                                <option value="Littoral" {% if zone.department == 'Littoral' %}selected{% endif %}>Littoral</option>
+                                <option value="Mono" {% if zone.department == 'Mono' %}selected{% endif %}>Mono</option>
+                                <option value="Ouémé" {% if zone.department == 'Ouémé' %}selected{% endif %}>Ouémé</option>
+                                <option value="Plateau" {% if zone.department == 'Plateau' %}selected{% endif %}>Plateau</option>
+                                <option value="Zou" {% if zone.department == 'Zou' %}selected{% endif %}>Zou</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="city" class="form-label">Ville / Commune</label>
+                            <input type="text" class="form-control" id="city" name="city" 
+                                   value="{{ zone.city or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="/zones" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Annuler
+                        </a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save"></i> Mettre à jour
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

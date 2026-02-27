@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de Bord - AgriSuivi Bénin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-chart-line"></i> Tableau de Bord</h1>
+    <div>
+        <span class="badge bg-success me-2">Mis à jour en temps réel</span>
+        <button class="btn btn-sm btn-outline-success" onclick="refreshData()">
+            <i class="fas fa-sync-alt"></i> Rafraîchir
+        </button>
+    </div>
+</div>
+
+<!-- Statistiques globales avec icônes -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary" style="border-radius: 15px;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">Produits</h6>
+                        <h2 class="mb-0">{{ stats.products_count }}</h2>
+                        <small>{{ stats.new_products_today or 0 }} nouveau(x) aujourd'hui</small>
+                    </div>
+                    <i class="fas fa-box fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success" style="border-radius: 15px;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">Zones</h6>
+                        <h2 class="mb-0">{{ stats.zones_count }}</h2>
+                        <small>{{ stats.active_zones or 0 }} actives</small>
+                    </div>
+                    <i class="fas fa-map-marker-alt fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info" style="border-radius: 15px;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">Stocks</h6>
+                        <h2 class="mb-0">{{ stats.stocks_count }}</h2>
+                        <small>{{ stats.low_stock_count or 0 }} stocks faibles</small>
+                    </div>
+                    <i class="fas fa-warehouse fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning" style="border-radius: 15px;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">Prix</h6>
+                        <h2 class="mb-0">{{ stats.prices_count }}</h2>
+                        <small>Prix moyen: {{ stats.avg_price or 0 }} FCFA</small>
+                    </div>
+                    <i class="fas fa-tag fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques principaux -->
+<div class="row mb-4">
+    <!-- Graphique 1 : Répartition par catégorie -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Répartition des produits par catégorie</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart" height="250"></canvas>
+                <div class="text-center mt-3">
+                    <small class="text-muted">Total: {{ stats.products_count }} produits</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Graphique 2 : Évolution des prix -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-line"></i> Évolution des prix (7 derniers jours)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="priceChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Graphique 3 : Top 5 des stocks -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Top 5 des produits en stock</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="stockChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Graphique 4 : Alertes stocks faibles -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Alertes stocks faibles</h5>
+            </div>
+            <div class="card-body">
+                {% if low_stock_alerts %}
+                <div class="list-group">
+                    {% for alert in low_stock_alerts %}
+                    <div class="list-group-item list-group-item-warning d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ alert.product_name }}</strong><br>
+                            <small>{{ alert.zone_name }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-danger">{{ "%.0f"|format(alert.quantity) }} {{ alert.unit }}</span>
+                            <br>
+                            <small class="text-muted">Seuil: 100</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center text-muted my-5">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i><br>
+                    Aucune alerte de stock faible
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Derniers enregistrements -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-tag"></i> Derniers prix enregistrés</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Produit</th>
+                                <th>Zone</th>
+                                <th>Prix (FCFA)</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for price in latest_prices %}
+                            <tr>
+                                <td>{{ price.product.name }}</td>
+                                <td>{{ price.zone.name }}</td>
+                                <td><strong>{{ "%.0f"|format(price.price) }}</strong></td>
+                                <td>{{ price.date.strftime('%d/%m/%Y') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center">Aucun prix enregistré</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if latest_prices %}
+                <div class="text-end mt-2">
+                    <a href="/prices" class="btn btn-sm btn-outline-success">Voir tous les prix</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-warehouse"></i> Derniers stocks enregistrés</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Produit</th>
+                                <th>Zone</th>
+                                <th>Quantité</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stock in latest_stocks %}
+                            <tr>
+                                <td>{{ stock.product.name }}</td>
+                                <td>{{ stock.zone.name }}</td>
+                                <td><strong>{{ "%.2f"|format(stock.quantity) }} {{ stock.product.unit }}</strong></td>
+                                <td>{{ stock.date.strftime('%d/%m/%Y') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center">Aucun stock enregistré</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if latest_stocks %}
+                <div class="text-end mt-2">
+                    <a href="/stocks" class="btn btn-sm btn-outline-success">Voir tous les stocks</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts pour les graphiques -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Graphique des catégories (camembert)
+    const ctx1 = document.getElementById('categoryChart').getContext('2d');
+    new Chart(ctx1, {
+        type: 'pie',
+        data: {
+            labels: {{ category_labels|safe }},
+            datasets: [{
+                data: {{ category_data|safe }},
+                backgroundColor: [
+                    '#28a745', '#17a2b8', '#ffc107', '#dc3545', '#6c757d',
+                    '#007bff', '#6610f2', '#fd7e14', '#20c997', '#e83e8c'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            let value = context.raw || 0;
+                            let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            let percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} produits (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 2. Graphique des prix (ligne)
+    const ctx2 = document.getElementById('priceChart').getContext('2d');
+    new Chart(ctx2, {
+        type: 'line',
+        data: {
+            labels: {{ price_dates|safe }},
+            datasets: [{
+                label: 'Prix moyen (FCFA)',
+                data: {{ price_data|safe }},
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value + ' FCFA';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 3. Graphique des stocks (barres)
+    const ctx3 = document.getElementById('stockChart').getContext('2d');
+    new Chart(ctx3, {
+        type: 'bar',
+        data: {
+            labels: {{ stock_labels|safe }},
+            datasets: [{
+                label: 'Quantité en stock',
+                data: {{ stock_data|safe }},
+                backgroundColor: '#28a745',
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+});
+
+// Fonction pour rafraîchir les données
+function refreshData() {
+    location.reload();
+}
+</script>
+
+<style>
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+    font-weight: 600;
+}
+.badge {
+    padding: 8px 12px;
+    font-size: 0.9em;
+}
+.table th {
+    background-color: #f8f9fa;
+}
+.opacity-50 {
+    opacity: 0.5;
+}
+</style>
+{% endblock %}

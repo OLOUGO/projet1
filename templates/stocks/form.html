@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Ajouter un Stock{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4><i class="fas fa-plus-circle"></i> Enregistrer un stock</h4>
+            </div>
+            <div class="card-body">
+                {% if errors %}
+                <div class="alert alert-danger">
+                    <ul class="mb-0">
+                        {% for error in errors %}
+                        <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <form method="post" id="stockForm" onsubmit="return validateForm()">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="product_id" class="form-label">
+                                <i class="fas fa-box"></i> Produit <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-control" id="product_id" name="product_id" required>
+                                <option value="" disabled selected>-- Choisir un produit --</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}" 
+                                    {% if form and form.product_id|int == product.id %}selected{% endif %}>
+                                    {{ product.name }} ({{ product.unit }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback" id="productError">
+                                Veuillez sélectionner un produit
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="zone_id" class="form-label">
+                                <i class="fas fa-map-marker-alt"></i> Zone <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-control" id="zone_id" name="zone_id" required>
+                                <option value="" disabled selected>-- Choisir une zone --</option>
+                                {% for zone in zones %}
+                                <option value="{{ zone.id }}"
+                                    {% if form and form.zone_id|int == zone.id %}selected{% endif %}>
+                                    {{ zone.name }} ({{ zone.city }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback" id="zoneError">
+                                Veuillez sélectionner une zone
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="quantity" class="form-label">
+                                <i class="fas fa-weight"></i> Quantité <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" step="0.01" min="0" class="form-control" 
+                                   id="quantity" name="quantity" 
+                                   value="{{ form.quantity if form else '' }}"
+                                   placeholder="Ex: 1500.50" required>
+                            <div class="invalid-feedback" id="quantityError">
+                                La quantité est requise et doit être positive
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="date" class="form-label">
+                                <i class="fas fa-calendar"></i> Date
+                            </label>
+                            <input type="datetime-local" class="form-control" 
+                                   id="date" name="date" 
+                                   value="{{ form.date if form else '' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">
+                            <i class="fas fa-sticky-note"></i> Notes
+                        </label>
+                        <textarea class="form-control" id="notes" name="notes" 
+                                  rows="2" placeholder="Informations complémentaires...">{{ form.notes if form else '' }}</textarea>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="/stocks" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Annuler
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Enregistrer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function validateForm() {
+    let isValid = true;
+    
+    // Réinitialiser
+    document.querySelectorAll('.form-control').forEach(f => f.classList.remove('is-invalid'));
+    
+    // Produit
+    const product = document.getElementById('product_id');
+    if (!product.value) {
+        product.classList.add('is-invalid');
+        document.getElementById('productError').style.display = 'block';
+        isValid = false;
+    }
+    
+    // Zone
+    const zone = document.getElementById('zone_id');
+    if (!zone.value) {
+        zone.classList.add('is-invalid');
+        document.getElementById('zoneError').style.display = 'block';
+        isValid = false;
+    }
+    
+    // Quantité
+    const quantity = document.getElementById('quantity');
+    if (!quantity.value || quantity.value <= 0) {
+        quantity.classList.add('is-invalid');
+        document.getElementById('quantityError').style.display = 'block';
+        isValid = false;
+    }
+    
+    if (!isValid) {
+        alert('Veuillez remplir tous les champs obligatoires');
+    }
+    
+    return isValid;
+}
+</script>
+{% endblock %}

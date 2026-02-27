@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Inscription - AgriSuivi Bénin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0"><i class="fas fa-user-plus"></i> Inscription</h4>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                
+                <form method="post" action="/register" id="registerForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Nom d'utilisateur</label>
+                        <input type="text" class="form-control" id="username" name="username" 
+                               required minlength="3" maxlength="50" pattern="[a-zA-Z0-9_]+"
+                               value="{{ request.form.username if request.form.username else '' }}">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle"></i> 
+                            ​​3-50 caractères (lettres, chiffres et _ uniquement)
+                        </div>
+                        <div class="invalid-feedback">
+                            Le nom d'utilisateur doit contenir au moins 3 caractères (lettres, chiffres ou _)
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               required maxlength="100"
+                               value="{{ request.form.email if request.form.email else '' }}">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle"></i> 
+                            Nous ne partagerons jamais votre email
+                        </div>
+                        <div class="invalid-feedback">
+                            Veuillez entrer une adresse email valide
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Mot de passe</label>
+                        <input type="password" class="form-control" id="password" name="password" 
+                               required minlength="6" maxlength="100">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle"></i> 
+                            Minimum 6 caractères
+                        </div>
+                        <div id="passwordStrength" class="mt-2">
+                            <div class="progress" style="height: 5px;">
+                                <div id="passwordStrengthBar" class="progress-bar" role="progressbar" style="width: 0%;"></div>
+                            </div>
+                            <small id="passwordStrengthText" class="text-muted"></small>
+                        </div>
+                        <div class="invalid-feedback">
+                            Le mot de passe doit contenir au moins 6 caractères
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirmer le mot de passe</label>
+                        <input type="password" class="form-control" id="confirm_password" 
+                               name="confirm_password" required minlength="6">
+                        <div class="invalid-feedback" id="confirmPasswordFeedback">
+                            Les mots de passe ne correspondent pas
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="terms" required>
+                        <label class="form-check-label" for="terms">
+                            J'accepte les <a href="#" class="text-success">conditions d'utilisation</a>
+                        </label>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success" id="submitBtn">
+                            <i class="fas fa-user-plus"></i> S'inscrire
+                        </button>
+                    </div>
+                </form>
+                
+                <hr>
+                
+                <p class="text-center mb-0">
+                    Déjà inscrit ? 
+                    <a href="/login" class="text-success">Se connecter</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Validation en temps réel
+document.getElementById('username').addEventListener('input', function(e) {
+    const username = e.target.value;
+    const isValid = /^[a-zA-Z0-9_]+$/.test(username) && username.length >= 3;
+    if (isValid) {
+        e.target.classList.remove('is-invalid');
+        e.target.classList.add('is-valid');
+    } else {
+        e.target.classList.remove('is-valid');
+        e.target.classList.add('is-invalid');
+    }
+});
+
+document.getElementById('email').addEventListener('input', function(e) {
+    const email = e.target.value;
+    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (isValid) {
+        e.target.classList.remove('is-invalid');
+        e.target.classList.add('is-valid');
+    } else {
+        e.target.classList.remove('is-valid');
+        e.target.classList.add('is-invalid');
+    }
+});
+
+// Force du mot de passe
+document.getElementById('password').addEventListener('input', function(e) {
+    const password = e.target.value;
+    const bar = document.getElementById('passwordStrengthBar');
+    const text = document.getElementById('passwordStrengthText');
+    
+    let strength = 0;
+    if (password.length >= 6) strength += 25;
+    if (password.match(/[a-z]+/)) strength += 25;
+    if (password.match(/[A-Z]+/)) strength += 25;
+    if (password.match(/[0-9]+/)) strength += 25;
+    
+    bar.style.width = strength + '%';
+    
+    if (strength < 50) {
+        bar.className = 'progress-bar bg-danger';
+        text.textContent = 'Faible';
+    } else if (strength < 75) {
+        bar.className = 'progress-bar bg-warning';
+        text.textContent = 'Moyen';
+    } else {
+        bar.className = 'progress-bar bg-success';
+        text.textContent = 'Fort';
+    }
+    
+    if (password.length >= 6) {
+        e.target.classList.remove('is-invalid');
+        e.target.classList.add('is-valid');
+    } else {
+        e.target.classList.remove('is-valid');
+        e.target.classList.add('is-invalid');
+    }
+    
+    // Vérifier la confirmation
+    checkPasswordMatch();
+});
+
+document.getElementById('confirm_password').addEventListener('input', function(e) {
+    checkPasswordMatch();
+});
+
+function checkPasswordMatch() {
+    const password = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm_password').value;
+    const confirmField = document.getElementById('confirm_password');
+    const feedback = document.getElementById('confirmPasswordFeedback');
+    
+    if (password === confirm && password.length >= 6) {
+        confirmField.classList.remove('is-invalid');
+        confirmField.classList.add('is-valid');
+        feedback.style.display = 'none';
+    } else {
+        confirmField.classList.remove('is-valid');
+        confirmField.classList.add('is-invalid');
+        feedback.style.display = 'block';
+    }
+}
+
+// Validation du formulaire avant soumission
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+    const username = document.getElementById('username');
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const confirm = document.getElementById('confirm_password');
+    const terms = document.getElementById('terms');
+    
+    let isValid = true;
+    
+    if (!/^[a-zA-Z0-9_]+$/.test(username.value) || username.value.length < 3) {
+        username.classList.add('is-invalid');
+        isValid = false;
+    }
+    
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+        email.classList.add('is-invalid');
+        isValid = false;
+    }
+    
+    if (password.value.length < 6) {
+        password.classList.add('is-invalid');
+        isValid = false;
+    }
+    
+    if (password.value !== confirm.value) {
+        confirm.classList.add('is-invalid');
+        isValid = false;
+    }
+    
+    if (!terms.checked) {
+        alert('Vous devez accepter les conditions d\'utilisation');
+        isValid = false;
+    }
+    
+    if (!isValid) {
+        e.preventDefault();
+    }
+});
+</script>
+
+<style>
+.form-control.is-valid {
+    border-color: #28a745;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%2328a745' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+
+#passwordStrength {
+    margin-top: 5px;
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+</style>
+{% endblock %}
