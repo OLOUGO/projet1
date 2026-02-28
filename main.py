@@ -282,6 +282,21 @@ async def debug_test_login(email: str, password: str, db: Session = Depends(get_
         "username": user.username
     }
 
+@app.get("/debug-test-login-get")
+async def debug_test_login_get(email: str, password: str, db: Session = Depends(get_db)):
+    """Version GET pour tester facilement depuis le navigateur"""
+    user = authenticate_user(db, email, password)
+    if not user:
+        return {"success": False, "error": "Identifiants invalides"}
+    
+    access_token = create_access_token(data={"sub": user.email})
+    return {
+        "success": True,
+        "access_token": access_token,
+        "user_id": user.id,
+        "username": user.username
+    }
+
 @app.get("/verify-migration")
 async def verify_migration(db: Session = Depends(get_db)):
     return {
@@ -332,6 +347,8 @@ async def check_render_db(db: Session = Depends(get_db)):
         "stocks_count": db.query(models.Stock).count(),
         "prices_count": db.query(models.Price).count()
     }
+
+
 
 @app.get("/")
 async def home(request: Request):
