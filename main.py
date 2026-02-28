@@ -277,6 +277,18 @@ async def debug_auth(request: Request):
     
     return result
 
+@app.get("/check-render-db")
+async def check_render_db(db: Session = Depends(get_db)):
+    """Vérifie que la base Render a les données"""
+    return {
+        "users_count": db.query(models.User).count(),
+        "users": [{"id": u.id, "username": u.username, "email": u.email} 
+                  for u in db.query(models.User).limit(5).all()],
+        "products_count": db.query(models.Product).count(),
+        "zones_count": db.query(models.Zone).count(),
+        "stocks_count": db.query(models.Stock).count(),
+        "prices_count": db.query(models.Price).count()
+    }
 
 @app.get("/")
 async def home(request: Request):
