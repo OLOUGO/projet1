@@ -9,7 +9,7 @@ import models
 from database import get_db
 
 # Configuration
-SECRET_KEY = "votre_cle_secrete_tres_longue_et_secure_12345"
+SECRET_KEY = "p_viw14GVYieuHQ_RVRB9FQlwrbiCZVlJHLcEx1IR3g"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
