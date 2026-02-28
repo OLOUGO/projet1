@@ -5,6 +5,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine, text
 from datetime import datetime, timedelta
+from datetime import datetime
 import models
 import sys
 import subprocess
@@ -452,6 +453,541 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             "latest_stocks": latest_stocks
         }
     )
+
+
+# ============================================
+# ROUTES PRODUITS
+# ============================================
+@app.get("/products")
+async def list_products(request: Request, db: Session = Depends(get_db)):
+    """Liste tous les produits"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    products = db.query(models.Product).all()
+    return templates.TemplateResponse(
+        "products/list.html",
+        {"request": request, "products": products, "user": user}
+    )
+
+@app.get("/products/add")
+async def add_product_form(request: Request, db: Session = Depends(get_db)):
+    """Formulaire d'ajout de produit"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    return templates.TemplateResponse(
+        "products/form.html",
+        {"request": request, "user": user}
+    )
+
+@app.post("/products/add")
+async def add_product(request: Request, db: Session = Depends(get_db)):
+    """Ajoute un produit"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    form = await request.form()
+    
+    product = models.Product(
+        name=form.get('name'),
+        category=form.get('category'),
+        unit=form.get('unit'),
+        description=form.get('description', ''),
+        created_by=user.id
+    )
+    
+    db.add(product)
+    db.commit()
+    
+    return RedirectResponse(url="/products", status_code=303)
+
+@app.get("/products/edit/{product_id}")
+async def edit_product_form(request: Request, product_id: int, db: Session = Depends(get_db)):
+    """Formulaire d'édition de produit"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    return templates.TemplateResponse(
+        "products/edit.html",
+        {"request": request, "product": product, "user": user}
+    )
+
+@app.post("/products/edit/{product_id}")
+async def edit_product(request: Request, product_id: int, db: Session = Depends(get_db)):
+    """Modifie un produit"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    form = await request.form()
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    
+    product.name = form.get('name')
+    product.category = form.get('category')
+    product.unit = form.get('unit')
+    product.description = form.get('description', '')
+    
+    db.commit()
+    return RedirectResponse(url="/products", status_code=303)
+
+@app.get("/products/delete/{product_id}")
+async def delete_product(product_id: int, db: Session = Depends(get_db)):
+    """Supprime un produit"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    db.delete(product)
+    db.commit()
+    return RedirectResponse(url="/products", status_code=303)
+
+
+# ============================================
+# ROUTES ZONES
+# ============================================
+@app.get("/zones")
+async def list_zones(request: Request, db: Session = Depends(get_db)):
+    """Liste toutes les zones"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    zones = db.query(models.Zone).all()
+    return templates.TemplateResponse(
+        "zones/list.html",
+        {"request": request, "zones": zones, "user": user}
+    )
+
+@app.get("/zones/add")
+async def add_zone_form(request: Request, db: Session = Depends(get_db)):
+    """Formulaire d'ajout de zone"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    return templates.TemplateResponse(
+        "zones/form.html",
+        {"request": request, "user": user}
+    )
+
+@app.post("/zones/add")
+async def add_zone(request: Request, db: Session = Depends(get_db)):
+    """Ajoute une zone"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    form = await request.form()
+    
+    zone = models.Zone(
+        name=form.get('name'),
+        type=form.get('type'),
+        department=form.get('department'),
+        city=form.get('city')
+    )
+    
+    db.add(zone)
+    db.commit()
+    
+    return RedirectResponse(url="/zones", status_code=303)
+
+@app.get("/zones/edit/{zone_id}")
+async def edit_zone_form(request: Request, zone_id: int, db: Session = Depends(get_db)):
+    """Formulaire d'édition de zone"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    zone = db.query(models.Zone).filter(models.Zone.id == zone_id).first()
+    return templates.TemplateResponse(
+        "zones/edit.html",
+        {"request": request, "zone": zone, "user": user}
+    )
+
+@app.post("/zones/edit/{zone_id}")
+async def edit_zone(request: Request, zone_id: int, db: Session = Depends(get_db)):
+    """Modifie une zone"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    form = await request.form()
+    zone = db.query(models.Zone).filter(models.Zone.id == zone_id).first()
+    
+    zone.name = form.get('name')
+    zone.type = form.get('type')
+    zone.department = form.get('department')
+    zone.city = form.get('city')
+    
+    db.commit()
+    return RedirectResponse(url="/zones", status_code=303)
+
+@app.get("/zones/delete/{zone_id}")
+async def delete_zone(zone_id: int, db: Session = Depends(get_db)):
+    """Supprime une zone"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    zone = db.query(models.Zone).filter(models.Zone.id == zone_id).first()
+    db.delete(zone)
+    db.commit()
+    return RedirectResponse(url="/zones", status_code=303)
+
+
+# ============================================
+# ROUTES STOCKS
+# ============================================
+@app.get("/stocks")
+async def list_stocks(request: Request, db: Session = Depends(get_db)):
+    """Liste tous les stocks"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    stocks = db.query(models.Stock).order_by(models.Stock.date.desc()).all()
+    return templates.TemplateResponse(
+        "stocks/list.html",
+        {"request": request, "stocks": stocks, "user": user}
+    )
+
+@app.get("/stocks/add")
+async def add_stock_form(request: Request, db: Session = Depends(get_db)):
+    """Formulaire d'ajout de stock"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    products = db.query(models.Product).all()
+    zones = db.query(models.Zone).all()
+    return templates.TemplateResponse(
+        "stocks/form.html",
+        {"request": request, "products": products, "zones": zones, "user": user}
+    )
+
+@app.post("/stocks/add")
+async def add_stock(request: Request, db: Session = Depends(get_db)):
+    """Ajoute un stock"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    form = await request.form()
+    
+    stock = models.Stock(
+        product_id=int(form.get('product_id')),
+        zone_id=int(form.get('zone_id')),
+        quantity=float(form.get('quantity')),
+        notes=form.get('notes', ''),
+        created_by=user.id
+    )
+    
+    if form.get('date'):
+        try:
+            stock.date = datetime.fromisoformat(form.get('date'))
+        except:
+            pass
+    
+    db.add(stock)
+    db.commit()
+    
+    return RedirectResponse(url="/stocks", status_code=303)
+
+@app.get("/stocks/edit/{stock_id}")
+async def edit_stock_form(request: Request, stock_id: int, db: Session = Depends(get_db)):
+    """Formulaire d'édition de stock"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    stock = db.query(models.Stock).filter(models.Stock.id == stock_id).first()
+    products = db.query(models.Product).all()
+    zones = db.query(models.Zone).all()
+    return templates.TemplateResponse(
+        "stocks/edit.html",
+        {"request": request, "stock": stock, "products": products, "zones": zones, "user": user}
+    )
+
+@app.post("/stocks/edit/{stock_id}")
+async def edit_stock(request: Request, stock_id: int, db: Session = Depends(get_db)):
+    """Modifie un stock"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    form = await request.form()
+    stock = db.query(models.Stock).filter(models.Stock.id == stock_id).first()
+    
+    stock.product_id = int(form.get('product_id'))
+    stock.zone_id = int(form.get('zone_id'))
+    stock.quantity = float(form.get('quantity'))
+    stock.notes = form.get('notes', '')
+    
+    db.commit()
+    return RedirectResponse(url="/stocks", status_code=303)
+
+@app.get("/stocks/delete/{stock_id}")
+async def delete_stock(stock_id: int, db: Session = Depends(get_db)):
+    """Supprime un stock"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    stock = db.query(models.Stock).filter(models.Stock.id == stock_id).first()
+    db.delete(stock)
+    db.commit()
+    return RedirectResponse(url="/stocks", status_code=303)
+
+
+
+# ============================================
+# ROUTES PRIX
+# ============================================
+@app.get("/prices")
+async def list_prices(request: Request, db: Session = Depends(get_db)):
+    """Liste tous les prix"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    prices = db.query(models.Price).order_by(models.Price.date.desc()).all()
+    return templates.TemplateResponse(
+        "prices/list.html",
+        {"request": request, "prices": prices, "user": user}
+    )
+
+@app.get("/prices/add")
+async def add_price_form(request: Request, db: Session = Depends(get_db)):
+    """Formulaire d'ajout de prix"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    products = db.query(models.Product).all()
+    zones = db.query(models.Zone).all()
+    return templates.TemplateResponse(
+        "prices/form.html",
+        {"request": request, "products": products, "zones": zones, "user": user}
+    )
+
+@app.post("/prices/add")
+async def add_price(request: Request, db: Session = Depends(get_db)):
+    """Ajoute un prix"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    form = await request.form()
+    
+    price = models.Price(
+        product_id=int(form.get('product_id')),
+        zone_id=int(form.get('zone_id')),
+        price=float(form.get('price')),
+        notes=form.get('notes', ''),
+        created_by=user.id
+    )
+    
+    if form.get('date'):
+        try:
+            price.date = datetime.fromisoformat(form.get('date'))
+        except:
+            pass
+    
+    db.add(price)
+    db.commit()
+    
+    return RedirectResponse(url="/prices", status_code=303)
+
+@app.get("/prices/edit/{price_id}")
+async def edit_price_form(request: Request, price_id: int, db: Session = Depends(get_db)):
+    """Formulaire d'édition de prix"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    price = db.query(models.Price).filter(models.Price.id == price_id).first()
+    products = db.query(models.Product).all()
+    zones = db.query(models.Zone).all()
+    return templates.TemplateResponse(
+        "prices/edit.html",
+        {"request": request, "price": price, "products": products, "zones": zones, "user": user}
+    )
+
+@app.post("/prices/edit/{price_id}")
+async def edit_price(request: Request, price_id: int, db: Session = Depends(get_db)):
+    """Modifie un prix"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(models.User).filter(models.User.email == user_email).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    form = await request.form()
+    price = db.query(models.Price).filter(models.Price.id == price_id).first()
+    
+    price.product_id = int(form.get('product_id'))
+    price.zone_id = int(form.get('zone_id'))
+    price.price = float(form.get('price'))
+    price.notes = form.get('notes', '')
+    
+    db.commit()
+    return RedirectResponse(url="/prices", status_code=303)
+
+@app.get("/prices/delete/{price_id}")
+async def delete_price(price_id: int, db: Session = Depends(get_db)):
+    """Supprime un prix"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    price = db.query(models.Price).filter(models.Price.id == price_id).first()
+    db.delete(price)
+    db.commit()
+    return RedirectResponse(url="/prices", status_code=303)
+
+# ============================================
+# ROUTES API
+# ============================================
+@app.get("/api/products")
+async def api_products(request: Request, db: Session = Depends(get_db)):
+    """API pour les produits"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return {"error": "Non authentifié"}
+    
+    products = db.query(models.Product).all()
+    return products
+
+@app.get("/api/zones")
+async def api_zones(request: Request, db: Session = Depends(get_db)):
+    """API pour les zones"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return {"error": "Non authentifié"}
+    
+    zones = db.query(models.Zone).all()
+    return zones
+
+@app.get("/api/stocks")
+async def api_stocks(request: Request, db: Session = Depends(get_db)):
+    """API pour les stocks"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return {"error": "Non authentifié"}
+    
+    stocks = db.query(models.Stock).all()
+    return stocks
+
+@app.get("/api/prices")
+async def api_prices(request: Request, db: Session = Depends(get_db)):
+    """API pour les prix"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return {"error": "Non authentifié"}
+    
+    prices = db.query(models.Price).all()
+    return prices
+
+@app.get("/api/stats")
+async def api_stats(request: Request, db: Session = Depends(get_db)):
+    """API pour les statistiques"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return {"error": "Non authentifié"}
+    
+    return {
+        "products_count": db.query(models.Product).count(),
+        "zones_count": db.query(models.Zone).count(),
+        "stocks_count": db.query(models.Stock).count(),
+        "prices_count": db.query(models.Price).count()
+    }
+
+
 # ============================================
 # POINT D'ENTRÉE
 # ============================================
