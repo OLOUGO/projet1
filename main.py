@@ -95,6 +95,19 @@ def verify_password_simple(plain_password, hashed_password):
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     return pwd_context.verify(plain_password, hashed_password)
 
+def get_user(request: Request):
+    """Retourne l'utilisateur à partir du cookie pour les templates"""
+    user_email = request.cookies.get("user_email")
+    if not user_email:
+        return None
+    
+    # Note: ici on ne peut pas faire de requête DB directement
+    # On retourne juste l'email, le template l'utilisera
+    return {"email": user_email, "is_authenticated": True}
+
+# Ajouter la fonction aux variables globales des templates
+templates.env.globals['get_user'] = get_user
+
 # ============================================
 # ROUTES D'AUTHENTIFICATION SIMPLIFIÉES
 # ============================================
@@ -324,7 +337,7 @@ async def list_products(request: Request, db: Session = Depends(get_db)):
 # ============================================
 @app.get("/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
-    """Dashboard (version adaptée)"""
+    """Dashboard avec tous les graphiques"""
     user_email = request.cookies.get("user_email")
     
     if not user_email:
@@ -336,8 +349,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/login", status_code=303)
     
     from sqlalchemy import func
+    from datetime import datetime, timedelta
     
-    # Statistiques
+    # ========== 1. STATISTIQUES GÉNÉRALES ==========
     stats = {
         "products_count": db.query(models.Product).count(),
         "zones_count": db.query(models.Zone).count(),
@@ -345,32 +359,99 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         "prices_count": db.query(models.Price).count()
     }
     
-    # Données pour graphiques
+    # ========== 2. RÉPARTITION PAR CATÉGORIE (Graphique 1) ==========
     categories = db.query(
         models.Product.category, 
         func.count(models.Product.id)
     ).group_by(models.Product.category).all()
     
-    category_labels = [c[0] for c in categories] if categories else []
-    category_data = [c[1] for c in categories] if categories else []
+    if categories:
+        category_labels = [c[0] for c in categories]
+        category_data = [c[1] for c in categories]
+    else:
+        category_labels = ['Aucune donnée']
+        category_data = [1]
     
-    # Derniers prix et stocks
-    latest_prices = db.query(models.Price).order_by(models.Price.date.desc()).limit(5).all()
-    latest_stocks = db.query(models.Stock).order_by(models.Stock.date.desc()).limit(5).all()
+    # ========== 3. ÉVOLUTION DES PRIX (Graphique 2) ==========
+    last_7_days = datetime.now() - timedelta(days=7)
+    prices = db.query(models.Price)\
+        .filter(models.Price.date >= last_7_days)\
+        .order_by(models.Price.date).all()
+    
+    if prices:
+        price_by_day = {}
+        for p in prices:
+            day = p.date.strftime('%d/%m')
+            if day not in price_by_day:
+                price_by_day[day] = []
+            price_by_day[day].append(p.price)
+        
+        price_dates = []
+        price_data = []
+        for day in sorted(price_by_day.keys()):
+            price_dates.append(day)
+            price_data.append(sum(price_by_day[day]) / len(price_by_day[day]))
+    else:
+        # Données par défaut pour l'exemple
+        price_dates = ['J-7', 'J-6', 'J-5', 'J-4', 'J-3', 'J-2', 'Aujourd\'hui']
+        price_data = [500, 520, 510, 530, 540, 550, 560]
+    
+    # ========== 4. TOP 5 DES STOCKS (Graphique 3) ==========
+    top_stocks = db.query(
+        models.Product.name,
+        models.Stock.quantity
+    ).join(models.Stock)\
+     .order_by(models.Stock.quantity.desc())\
+     .limit(5).all()
+    
+    if top_stocks:
+        stock_labels = [s[0][:15] + '...' if len(s[0]) > 15 else s[0] for s in top_stocks]
+        stock_data = [float(s[1]) for s in top_stocks]
+    else:
+        stock_labels = ['Maïs', 'Riz', 'Tomate', 'Manioc', 'Haricot']
+        stock_data = [1500, 800, 200, 450, 300]
+    
+    # ========== 5. ALERTES STOCKS FAIBLES ==========
+    low_stock_alerts = db.query(
+        models.Product.name.label('product_name'),
+        models.Zone.name.label('zone_name'),
+        models.Stock.quantity,
+        models.Product.unit
+    ).join(models.Product).join(models.Zone)\
+     .filter(models.Stock.quantity < 100)\
+     .order_by(models.Stock.quantity)\
+     .limit(10).all()
+    
+    # ========== 6. DERNIERS ENREGISTREMENTS ==========
+    latest_prices = db.query(models.Price)\
+        .order_by(models.Price.date.desc())\
+        .limit(5).all()
+    
+    latest_stocks = db.query(models.Stock)\
+        .order_by(models.Stock.date.desc())\
+        .limit(5).all()
+    
+    # Token pour compatibilité avec les anciens templates (optionnel)
+    token = request.cookies.get("access_token")
     
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
             "user": user,
+            "token": token,
             "stats": stats,
             "category_labels": category_labels,
             "category_data": category_data,
+            "price_dates": price_dates,
+            "price_data": price_data,
+            "stock_labels": stock_labels,
+            "stock_data": stock_data,
+            "low_stock_alerts": low_stock_alerts,
             "latest_prices": latest_prices,
             "latest_stocks": latest_stocks
         }
     )
-
 # ============================================
 # POINT D'ENTRÉE
 # ============================================
