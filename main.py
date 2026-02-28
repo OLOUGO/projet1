@@ -239,6 +239,49 @@ templates.env.globals['get_user'] = get_user_from_request
 # ============================================
 # PARTIE 9: ROUTES D'AUTHENTIFICATION
 # ============================================
+
+# 1. Pour voir l'état de l'authentification à un instant T
+@app.get("/debug-auth-state")
+async def debug_auth_state(request: Request):
+    """Voir le contenu des cookies et l'état de l'utilisateur"""
+    token = request.cookies.get("access_token")
+    auth_status = {
+        "cookies_keys": list(request.cookies.keys()),
+        "has_token": token is not None,
+        "token_preview": token[:20] + "..." if token and len(token) > 20 else token,
+        "user_from_state": getattr(request.state, 'user', None),
+    }
+    
+    # Essayer de décoder le token si présent
+    if token and token.startswith("Bearer "):
+        try:
+            token_value = token.replace("Bearer ", "")
+            payload = jwt.decode(token_value, SECRET_KEY, algorithms=[ALGORITHM])
+            auth_status["token_payload"] = payload
+            auth_status["token_valid"] = True
+        except Exception as e:
+            auth_status["token_error"] = str(e)
+            auth_status["token_valid"] = False
+            
+    return auth_status
+
+# 2. Pour tester la connexion sans passer par le formulaire HTML
+@app.post("/debug-test-login")
+async def debug_test_login(email: str, password: str, db: Session = Depends(get_db)):
+    """Teste la connexion et retourne le token sans redirection"""
+    user = authenticate_user(db, email, password)
+    if not user:
+        return {"success": False, "error": "Identifiants invalides"}
+    
+    access_token = create_access_token(data={"sub": user.email})
+    return {
+        "success": True,
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": user.id,
+        "username": user.username
+    }
+
 @app.get("/verify-migration")
 async def verify_migration(db: Session = Depends(get_db)):
     return {
