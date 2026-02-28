@@ -3,56 +3,147 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import RedirectResponse
-from fastapi.responses import JSONResponse  # Ajoute en haut du fichier
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt
-from sqlalchemy.orm import Session
-from datetime import timedelta
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import create_engine, text
+from sqlalchemy.ext.declarative import declarative_base
+from datetime import timedelta, datetime
 import models
 from auth import get_current_active_user
-from database import engine, SessionLocal, get_db
-
 import sys
 import subprocess
+import os
 
+# ============================================
+# PARTIE 1: DIAGNOSTIC (à garder temporairement)
+# ============================================
 print("🔍 VÉRIFICATION DES PACKAGES INSTALLÉS")
 print("=" * 50)
 
-# Vérifier si jinja2 est installé
 try:
     import jinja2
     print(f"✅ jinja2 est installé (version: {jinja2.__version__})")
 except ImportError:
     print("❌ jinja2 N'EST PAS installé")
 
+try:
+    import psycopg2
+    print(f"✅ psycopg2 est installé")
+except ImportError:
+    print("❌ psycopg2 N'EST PAS installé")
+
 print("\n📦 Liste complète des packages:")
 result = subprocess.run(['pip', 'freeze'], capture_output=True, text=True)
 print(result.stdout)
 print("=" * 50)
 
-
+# ============================================
+# PARTIE 2: IMPORTS DE VOS MODULES
+# ============================================
 from auth import (
     authenticate_user, create_access_token, get_current_active_user,
     get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, ALGORITHM
 )
 
-# Création des tables
-models.Base.metadata.create_all(bind=engine)
+# ============================================
+# PARTIE 3: CONFIGURATION POSTGRESQL
+# ============================================
 
-# Initialisation FastAPI
+# Récupérer l'URL depuis les variables d'environnement Render
+DATABASE_URL = os.environ.get('DATABASE_URL', None)
+
+if DATABASE_URL is None:
+    # 🔴 REMPLACEZ CETTE LIGNE PAR VOTRE VRAIE URL POSTGRESQL
+    DATABASE_URL = "postgresql://agrisuivi_admin:7w4TAfaflBx84orEne0tiMuqFCqy72lq@dpg-d6gtcd9drdic73cd8n30-a.frankfurt-postgres.render.com/agrisuivi_production"
+    print("⚠️  UTILISATION DE L'URL EN DUR - POUR TEST LOCAL SEULEMENT")
+else:
+    print("✅ Variable DATABASE_URL trouvée dans l'environnement")
+
+# Correction pour les URLs qui commencent par postgres://
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+    print("🔄 URL convertie")
+
+# Ajouter sslmode=require si nécessaire (obligatoire sur Render)
+if 'sslmode' not in DATABASE_URL:
+    if '?' in DATABASE_URL:
+        DATABASE_URL += '&sslmode=require'
+    else:
+        DATABASE_URL += '?sslmode=require'
+    print("🔒 Ajout de sslmode=require")
+
+# Création du moteur SQLAlchemy pour PostgreSQL
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=5,
+    max_overflow=10,
+    echo=True  # Met à False en production
+)
+
+# Création de la session locale
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Fonction get_db pour les dépendances
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Test de connexion
+try:
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+    print("✅ Connexion à PostgreSQL (agrisuivi-db) réussie !")
+except Exception as e:
+    print(f"❌ Erreur de connexion: {e}")
+
+# ============================================
+# PARTIE 4: CRÉATION DES TABLES
+# ============================================
+print("🔄 Création/vérification des tables...")
+models.Base.metadata.create_all(bind=engine)
+print("✅ Tables créées/vérifiées")
+
+# ============================================
+# PARTIE 5: INITIALISATION FASTAPI
+# ============================================
 app = FastAPI(title="AgriSuivi Bénin")
 
 # Configuration des templates et fichiers statiques
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# ============================================
+# PARTIE 6: ROUTE DE TEST POUR LA BASE DE DONNÉES
+# ============================================
+@app.get("/health-db")
+async def health_db():
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT current_database()"))
+            db_name = result.scalar()
+            return {
+                "status": "ok",
+                "database": db_name,
+                "message": f"✅ Connecté à {db_name}"
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"❌ {str(e)}"
+        }
 
-# Configuration personnalisée de Swagger
+# ============================================
+# PARTIE 7: CONFIGURATION SWAGGER
+# ============================================
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
     
-    # Générer le schéma OpenAPI de base
     openapi_schema = get_openapi(
         title="AgriSuivi Bénin API",
         version="1.0.0",
@@ -60,7 +151,6 @@ def custom_openapi():
         routes=app.routes,
     )
     
-    # Définir le schéma de sécurité (Bearer Token)
     openapi_schema["components"] = {
         "securitySchemes": {
             "BearerAuth": {
@@ -72,11 +162,8 @@ def custom_openapi():
         }
     }
     
-    # Appliquer la sécurité à toutes les routes qui en ont besoin
-    # (optionnel - tu peux aussi le faire route par route)
     for path in openapi_schema["paths"].values():
         for operation in path.values():
-            # Ne pas ajouter de sécurité aux routes d'authentification
             if "/token" not in operation.get("operationId", ""):
                 operation["security"] = [{"BearerAuth": []}]
     
@@ -84,7 +171,29 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
-# ========== MIDDLEWARE ==========
+
+# ============================================
+# PARTIE 8: MIDDLEWARE
+# ============================================
+
+@app.get("/check-data")
+async def check_data(db: Session = Depends(get_db)):
+    """Vérifie les données dans PostgreSQL"""
+    return {
+        "users_count": db.query(models.User).count(),
+        "products_count": db.query(models.Product).count(),
+        "zones_count": db.query(models.Zone).count(),
+        "stocks_count": db.query(models.Stock).count(),
+        "prices_count": db.query(models.Price).count(),
+        "sample_users": [
+            {"id": u.id, "username": u.username, "email": u.email}
+            for u in db.query(models.User).limit(5).all()
+        ],
+        "sample_products": [
+            {"id": p.id, "name": p.name, "category": p.category}
+            for p in db.query(models.Product).limit(5).all()
+        ]
+    }
 @app.middleware("http")
 async def add_user_to_request(request: Request, call_next):
     token = request.cookies.get("access_token")
@@ -92,7 +201,7 @@ async def add_user_to_request(request: Request, call_next):
         token = token.replace("Bearer ", "")
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            email = payload.get("sub")  # Maintenant on cherche par email
+            email = payload.get("sub")
             if email:
                 db = SessionLocal()
                 user = db.query(models.User).filter(models.User.email == email).first()
@@ -107,26 +216,29 @@ async def add_user_to_request(request: Request, call_next):
     
     response = await call_next(request)
     return response
+
 # Fonction pour les templates
 def get_user_from_request(request: Request):
     return getattr(request.state, 'user', None)
 
 templates.env.globals['get_user'] = get_user_from_request
 
-# ========== ROUTE D'ACCUEIL ==========
+# ============================================
+# PARTIE 9: ROUTES D'AUTHENTIFICATION
+# ============================================
+
 @app.get("/")
 async def home(request: Request):
     user = getattr(request.state, 'user', None)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
     
-    # Récupérer le token depuis le cookie
     token = request.cookies.get("access_token")
     if token and token.startswith("Bearer "):
         token = token.replace("Bearer ", "")
     
     return templates.TemplateResponse(
-        "base.html",  # Ou ta page d'accueil
+        "base.html",
         {
             "request": request,
             "token": token,
@@ -134,12 +246,9 @@ async def home(request: Request):
         }
     )
 
-# ========== AUTHENTIFICATION ==========
-
 @app.get("/login")
 async def login_form(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
-
 
 @app.post("/token")
 async def login(request: Request, db: Session = Depends(get_db)):
@@ -168,7 +277,6 @@ async def login(request: Request, db: Session = Depends(get_db)):
             expires_delta=access_token_expires
         )
         
-        # 🔴 REDIRECTION VERS DASHBOARD au lieu de la page d'accueil
         response = RedirectResponse(url="/dashboard", status_code=303)
         
         response.set_cookie(
@@ -186,6 +294,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
             "login.html",
             {"request": request, "error": "Erreur lors de la connexion"}
         )
+
 @app.get("/register")
 async def register_form(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
@@ -194,41 +303,33 @@ async def register_form(request: Request):
 async def register(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     
-    # Validation des données
     errors = []
     
-    # Validation du nom d'utilisateur
     username = form['username']
     if len(username) < 3 or len(username) > 50:
         errors.append("Le nom d'utilisateur doit contenir entre 3 et 50 caractères")
     elif not username.replace('_', '').isalnum():
         errors.append("Le nom d'utilisateur ne peut contenir que des lettres, chiffres et _")
     
-    # Validation de l'email (doit être unique)
     email = form['email']
     if '@' not in email or '.' not in email or len(email) > 100:
         errors.append("Veuillez entrer une adresse email valide")
     else:
-        # Vérifier si l'email existe déjà
         existing_email = db.query(models.User).filter(models.User.email == email).first()
         if existing_email:
             errors.append("Cet email est déjà utilisé")
     
-    # Validation du mot de passe
     password = form['password']
     if len(password) < 6:
         errors.append("Le mot de passe doit contenir au moins 6 caractères")
     
-    # Vérification de la confirmation
     if password != form['confirm_password']:
         errors.append("Les mots de passe ne correspondent pas")
     
-    # Vérifier si le nom d'utilisateur existe déjà
     existing_username = db.query(models.User).filter(models.User.username == username).first()
     if existing_username:
         errors.append("Ce nom d'utilisateur est déjà utilisé")
     
-    # Si erreurs de validation
     if errors:
         return templates.TemplateResponse(
             "register.html",
@@ -239,7 +340,6 @@ async def register(request: Request, db: Session = Depends(get_db)):
             }
         )
     
-    # Créer le nouvel utilisateur
     hashed_password = get_password_hash(password)
     user = models.User(
         username=username,
@@ -255,13 +355,17 @@ async def register(request: Request, db: Session = Depends(get_db)):
         "login.html",
         {"request": request, "success": "Inscription réussie ! Vous pouvez maintenant vous connecter avec votre email."}
     )
+
 @app.get("/logout")
 async def logout():
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("access_token")
     return response
 
-# ========== PRODUITS ==========
+# ============================================
+# PARTIE 10: ROUTES PRODUITS
+# ============================================
+
 @app.get("/products")
 async def list_products(request: Request, db: Session = Depends(get_db)):
     products = db.query(models.Product).all()
@@ -283,7 +387,6 @@ async def add_product(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     errors = []
     
-    # Validation de TOUS les champs
     if not form.get('name') or not form['name'].strip():
         errors.append("Le nom du produit est requis")
     elif len(form['name'].strip()) < 2:
@@ -300,18 +403,16 @@ async def add_product(request: Request, db: Session = Depends(get_db)):
     elif len(form['description'].strip()) < 5:
         errors.append("La description doit contenir au moins 5 caractères")
     
-    # Si erreurs, retourner le formulaire avec les messages
     if errors:
         return templates.TemplateResponse(
             "products/form.html",
             {
                 "request": request,
                 "errors": errors,
-                "form": form  # Pour pré-remplir le formulaire
+                "form": form
             }
         )
     
-    # Création du produit
     product = models.Product(
         name=form['name'].strip(),
         category=form['category'],
@@ -323,6 +424,7 @@ async def add_product(request: Request, db: Session = Depends(get_db)):
     db.commit()
     
     return RedirectResponse(url="/products", status_code=303)
+
 @app.get("/products/edit/{product_id}")
 async def edit_product_form(request: Request, product_id: int, db: Session = Depends(get_db)):
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
@@ -349,7 +451,10 @@ async def delete_product(product_id: int, db: Session = Depends(get_db)):
     db.commit()
     return RedirectResponse(url="/products", status_code=303)
 
-# ========== ZONES ==========
+# ============================================
+# PARTIE 11: ROUTES ZONES
+# ============================================
+
 @app.get("/zones")
 async def list_zones(request: Request, db: Session = Depends(get_db)):
     zones = db.query(models.Zone).all()
@@ -371,7 +476,6 @@ async def add_zone(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     errors = []
     
-    # Validation du nom
     name = form.get('name', '').strip()
     if not name:
         errors.append("Le nom de la zone est requis")
@@ -380,19 +484,16 @@ async def add_zone(request: Request, db: Session = Depends(get_db)):
     elif len(name) > 100:
         errors.append("Le nom de la zone ne peut pas dépasser 100 caractères")
     
-    # Validation du type
     zone_type = form.get('type')
     if not zone_type:
         errors.append("Le type de zone est requis")
     elif zone_type not in ['Marché', 'Dépôt', 'Commune', 'Arrondissement']:
         errors.append("Type de zone invalide")
     
-    # Validation du département
     department = form.get('department')
     if not department:
         errors.append("Le département est requis")
     
-    # Validation de la ville
     city = form.get('city', '').strip()
     if not city:
         errors.append("La ville est requise")
@@ -401,7 +502,6 @@ async def add_zone(request: Request, db: Session = Depends(get_db)):
     elif len(city) > 100:
         errors.append("La ville ne peut pas dépasser 100 caractères")
     
-    # Si erreurs, retourner le formulaire
     if errors:
         return templates.TemplateResponse(
             "zones/form.html",
@@ -417,7 +517,6 @@ async def add_zone(request: Request, db: Session = Depends(get_db)):
             }
         )
     
-    # Création de la zone
     try:
         zone = models.Zone(
             name=name,
@@ -466,7 +565,10 @@ async def delete_zone(zone_id: int, db: Session = Depends(get_db)):
     db.commit()
     return RedirectResponse(url="/zones", status_code=303)
 
-# ========== STOCKS ==========
+# ============================================
+# PARTIE 12: ROUTES STOCKS
+# ============================================
+
 @app.get("/stocks")
 async def list_stocks(request: Request, db: Session = Depends(get_db)):
     user = getattr(request.state, 'user', None)
@@ -501,7 +603,6 @@ async def add_stock(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     errors = []
     
-    # Validation
     if not form.get('product_id'):
         errors.append("Le produit est requis")
     if not form.get('zone_id'):
@@ -578,7 +679,10 @@ async def delete_stock(stock_id: int, db: Session = Depends(get_db)):
     db.commit()
     return RedirectResponse(url="/stocks", status_code=303)
 
-# ========== PRIX ==========
+# ============================================
+# PARTIE 13: ROUTES PRIX
+# ============================================
+
 @app.get("/prices")
 async def list_prices(request: Request, db: Session = Depends(get_db)):
     user = getattr(request.state, 'user', None)
@@ -613,7 +717,6 @@ async def add_price(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     errors = []
     
-    # Validation
     if not form.get('product_id'):
         errors.append("Le produit est requis")
     
@@ -646,7 +749,6 @@ async def add_price(request: Request, db: Session = Depends(get_db)):
             }
         )
     
-    # Création
     price = models.Price(
         product_id=int(form['product_id']),
         zone_id=int(form['zone_id']),
@@ -701,7 +803,6 @@ async def edit_price(request: Request, price_id: int, db: Session = Depends(get_
     
     errors = []
     
-    # Validation
     if not form.get('product_id'):
         errors.append("Le produit est requis")
     
@@ -734,7 +835,6 @@ async def edit_price(request: Request, price_id: int, db: Session = Depends(get_
             }
         )
     
-    # Mise à jour
     price.product_id = int(form['product_id'])
     price.zone_id = int(form['zone_id'])
     price.price = float(form['price'])
@@ -761,12 +861,14 @@ async def delete_price(price_id: int, db: Session = Depends(get_db)):
         db.commit()
     return RedirectResponse(url="/prices", status_code=303)
 
-# ========== API POUR L'ÉQUIPE 3 (MAINTENANT PROTÉGÉES) ==========
+# ============================================
+# PARTIE 14: API POUR L'ÉQUIPE 3
+# ============================================
 
 @app.get("/api/products")
 async def get_products(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)  # ← AJOUTÉ
+    current_user: models.User = Depends(get_current_active_user)
 ):
     products = db.query(models.Product).all()
     return products
@@ -774,7 +876,7 @@ async def get_products(
 @app.get("/api/zones")
 async def get_zones(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)  # ← AJOUTÉ
+    current_user: models.User = Depends(get_current_active_user)
 ):
     zones = db.query(models.Zone).all()
     return zones
@@ -782,7 +884,7 @@ async def get_zones(
 @app.get("/api/stocks")
 async def get_stocks(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)  # ← AJOUTÉ
+    current_user: models.User = Depends(get_current_active_user)
 ):
     stocks = db.query(models.Stock).all()
     return stocks
@@ -790,7 +892,7 @@ async def get_stocks(
 @app.get("/api/prices")
 async def get_prices(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)  # ← AJOUTÉ
+    current_user: models.User = Depends(get_current_active_user)
 ):
     prices = db.query(models.Price).all()
     return prices
@@ -798,7 +900,7 @@ async def get_prices(
 @app.get("/api/stats")
 async def get_stats(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)  # ← AJOUTÉ
+    current_user: models.User = Depends(get_current_active_user)
 ):
     return {
         "products_count": db.query(models.Product).count(),
@@ -806,29 +908,24 @@ async def get_stats(
         "stocks_count": db.query(models.Stock).count(),
         "prices_count": db.query(models.Price).count()
     }
-# ========== POINT D'ENTRÉE ==========
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
 
-# ========== DASHBOARD ==========
+# ============================================
+# PARTIE 15: DASHBOARD
+# ============================================
+
 @app.get("/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     user = getattr(request.state, 'user', None)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
     
-    # ========== DONNÉES POUR LES GRAPHIQUES ==========
-    
-    # 1. RÉPARTITION PAR CATÉGORIE
     from sqlalchemy import func
+    
+    # Répartition par catégorie
     categories = db.query(
         models.Product.category, 
         func.count(models.Product.id)
     ).group_by(models.Product.category).all()
-    
-    # Debug print
-    print("🔍 Catégories trouvées:", categories)
     
     if categories:
         category_labels = [c[0] for c in categories]
@@ -837,7 +934,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         category_labels = ['Aucune donnée']
         category_data = [1]
     
-    # 2. ÉVOLUTION DES PRIX (simplifiée)
+    # Évolution des prix
     from datetime import datetime, timedelta
     last_7_days = datetime.now() - timedelta(days=7)
     prices = db.query(models.Price)\
@@ -845,7 +942,6 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         .order_by(models.Price.date).all()
     
     if prices:
-        # Grouper par jour
         price_by_day = {}
         for p in prices:
             day = p.date.strftime('%d/%m')
@@ -853,18 +949,16 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 price_by_day[day] = []
             price_by_day[day].append(p.price)
         
-        # Calculer la moyenne par jour
         price_dates = []
         price_data = []
         for day in sorted(price_by_day.keys()):
             price_dates.append(day)
             price_data.append(sum(price_by_day[day]) / len(price_by_day[day]))
     else:
-        # Données par défaut
         price_dates = ['J-7', 'J-6', 'J-5', 'J-4', 'J-3', 'J-2', 'J-1', 'Aujourd\'hui']
         price_data = [500, 520, 510, 530, 540, 550, 560, 570]
     
-    # 3. TOP 5 DES STOCKS
+    # Top 5 des stocks
     top_stocks = db.query(
         models.Product.name,
         models.Stock.quantity
@@ -879,7 +973,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         stock_labels = ['Maïs', 'Riz', 'Tomate', 'Manioc', 'Haricot']
         stock_data = [1500, 800, 200, 450, 300]
     
-    # 4. ALERTES STOCKS FAIBLES
+    # Alertes stocks faibles
     low_stock_alerts = db.query(
         models.Product.name.label('product_name'),
         models.Zone.name.label('zone_name'),
@@ -907,7 +1001,6 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         .order_by(models.Stock.date.desc())\
         .limit(5).all()
     
-    # Token pour l'affichage
     token = request.cookies.get("access_token")
     if token and token.startswith("Bearer "):
         token = token.replace("Bearer ", "")
@@ -917,7 +1010,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         {
             "request": request,
             "token": token,
-            "ACCESS_TOKEN_EXPIRE_MINUTES": 30,
+            "ACCESS_TOKEN_EXPIRE_MINUTES": ACCESS_TOKEN_EXPIRE_MINUTES,
             "stats": stats,
             "category_labels": category_labels,
             "category_data": category_data,
@@ -930,154 +1023,10 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             "latest_stocks": latest_stocks
         }
     )
-    user = getattr(request.state, 'user', None)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-    
-    # 🔴 RÉCUPÉRER LE TOKEN DU COOKIE
-    token = request.cookies.get("access_token")
-    if token and token.startswith("Bearer "):
-        token = token.replace("Bearer ", "")
-    
-    # Statistiques
-    stats = {
-        "products_count": db.query(models.Product).count(),
-        "zones_count": db.query(models.Zone).count(),
-        "stocks_count": db.query(models.Stock).count(),
-        "prices_count": db.query(models.Price).count()
-    }
-    
-    latest_prices = db.query(models.Price)\
-        .order_by(models.Price.date.desc())\
-        .limit(5)\
-        .all()
-    
-    latest_stocks = db.query(models.Stock)\
-        .order_by(models.Stock.date.desc())\
-        .limit(5)\
-        .all()
-    
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-            "stats": stats,
-            "latest_prices": latest_prices,
-            "latest_stocks": latest_stocks,
-            "token": token,  # 🔴 PASSER LE TOKEN AU TEMPLATE
-            "ACCESS_TOKEN_EXPIRE_MINUTES": ACCESS_TOKEN_EXPIRE_MINUTES
-        }
-    )
-    user = getattr(request.state, 'user', None)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-    
-    try:
-        # Statistiques générales
-        stats = {
-            "products_count": db.query(models.Product).count(),
-            "zones_count": db.query(models.Zone).count(),
-            "stocks_count": db.query(models.Stock).count(),
-            "prices_count": db.query(models.Price).count()
-        }
-        
-        # Derniers prix (5 derniers)
-        latest_prices = db.query(models.Price)\
-            .order_by(models.Price.date.desc())\
-            .limit(5)\
-            .all()
-        
-        # Derniers stocks (5 derniers)
-        latest_stocks = db.query(models.Stock)\
-            .order_by(models.Stock.date.desc())\
-            .limit(5)\
-            .all()
-        
-        return templates.TemplateResponse(
-            "dashboard.html",
-            {
-                "request": request,
-                "stats": stats,
-                "latest_prices": latest_prices,
-                "latest_stocks": latest_stocks
-            }
-        )
-    except Exception as e:
-        print(f"Erreur dashboard: {e}")
-        return templates.TemplateResponse(
-            "dashboard.html",
-            {
-                "request": request,
-                "stats": {"products_count": 0, "zones_count": 0, "stocks_count": 0, "prices_count": 0},
-                "latest_prices": [],
-                "latest_stocks": []
-            }
-        )
-    user = getattr(request.state, 'user', None)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-    
-    # Statistiques générales
-    stats = {
-        "products_count": db.query(models.Product).count(),
-        "zones_count": db.query(models.Zone).count(),
-        "stocks_count": db.query(models.Stock).count(),
-        "prices_count": db.query(models.Price).count()
-    }
-    
-    # Données pour les graphiques
-    from sqlalchemy import func
-    
-    # Répartition par catégorie
-    categories = db.query(
-        models.Product.category, 
-        func.count(models.Product.id)
-    ).group_by(models.Product.category).all()
-    
-    category_labels = [c[0] for c in categories]
-    category_data = [c[1] for c in categories]
-    
-    # Top stocks
-    top_stocks = db.query(
-        models.Product.name,
-        func.sum(models.Stock.quantity).label('total')
-    ).join(models.Stock).group_by(models.Product.id)\
-     .order_by(func.sum(models.Stock.quantity).desc())\
-     .limit(5).all()
-    
-    stock_labels = [s[0] for s in top_stocks]
-    stock_data = [float(s[1]) for s in top_stocks]
-    
-    # Alertes stocks faibles (moins de 100 unités)
-    low_stock_alerts = db.query(
-        models.Product.name.label('product_name'),
-        models.Zone.name.label('zone_name'),
-        models.Stock.quantity,
-        models.Product.unit
-    ).join(models.Product).join(models.Zone)\
-     .filter(models.Stock.quantity < 100)\
-     .order_by(models.Stock.quantity).limit(6).all()
-    
-    # Derniers enregistrements
-    latest_prices = db.query(models.Price)\
-        .order_by(models.Price.date.desc())\
-        .limit(5).all()
-    
-    latest_stocks = db.query(models.Stock)\
-        .order_by(models.Stock.date.desc())\
-        .limit(5).all()
-    
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-            "stats": stats,
-            "category_labels": category_labels,
-            "category_data": category_data,
-            "stock_labels": stock_labels,
-            "stock_data": stock_data,
-            "low_stock_alerts": low_stock_alerts,
-            "latest_prices": latest_prices,
-            "latest_stocks": latest_stocks
-        }
-    )
+
+# ============================================
+# PARTIE 16: POINT D'ENTRÉE
+# ============================================
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
