@@ -239,6 +239,16 @@ templates.env.globals['get_user'] = get_user_from_request
 # ============================================
 # PARTIE 9: ROUTES D'AUTHENTIFICATION
 # ============================================
+@app.get("/verify-migration")
+async def verify_migration(db: Session = Depends(get_db)):
+    return {
+        "users": [{"id": u.id, "username": u.username, "email": u.email} for u in db.query(User).all()],
+        "products_count": db.query(Product).count(),
+        "zones_count": db.query(Zone).count(),
+        "stocks_count": db.query(Stock).count(),
+        "prices_count": db.query(Price).count()
+    }
+
 @app.get("/debug-auth")
 async def debug_auth(request: Request):
     """Diagnostic d'authentification"""
@@ -329,7 +339,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
               httponly=True,
               max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
               secure=True,  # IMPORTANT pour HTTPS
-              xsamesite="lax"
+              samesite="lax"
         )
         
         return response
