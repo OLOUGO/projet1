@@ -194,24 +194,37 @@ async def check_data(db: Session = Depends(get_db)):
             for p in db.query(models.Product).limit(5).all()
         ]
     }
+
 @app.middleware("http")
 async def add_user_to_request(request: Request, call_next):
-    token = request.cookies.get("access_token")
-    if token and token.startswith("Bearer "):
-        token = token.replace("Bearer ", "")
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            email = payload.get("sub")
-            if email:
-                db = SessionLocal()
-                user = db.query(models.User).filter(models.User.email == email).first()
-                request.state.user = user
-                db.close()
-            else:
+    try:
+        token = request.cookies.get("access_token")
+        print(f"Middleware - Token présent: {bool(token)}")  # DEBUG
+        
+        if token and token.startswith("Bearer "):
+            token = token.replace("Bearer ", "")
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                email = payload.get("sub")
+                print(f"Middleware - Email du token: {email}")  # DEBUG
+                
+                if email:
+                    db = SessionLocal()
+                    try:
+                        user = db.query(models.User).filter(models.User.email == email).first()
+                        request.state.user = user
+                        print(f"Middleware - Utilisateur trouvé: {user.username if user else 'Non'}")  # DEBUG
+                    finally:
+                        db.close()
+                else:
+                    request.state.user = None
+            except Exception as e:
+                print(f"Middleware - Erreur JWT: {e}")  # DEBUG
                 request.state.user = None
-        except:
+        else:
             request.state.user = None
-    else:
+    except Exception as e:
+        print(f"Middleware - Erreur générale: {e}")
         request.state.user = None
     
     response = await call_next(request)
@@ -226,13 +239,45 @@ templates.env.globals['get_user'] = get_user_from_request
 # ============================================
 # PARTIE 9: ROUTES D'AUTHENTIFICATION
 # ============================================
+@app.get("/debug-auth")
+async def debug_auth(request: Request):
+    """Diagnostic d'authentification"""
+    result = {
+        "cookies": dict(request.cookies),
+        "has_token": "access_token" in request.cookies,
+        "user_state": getattr(request.state, 'user', None),
+        "headers": {
+            "host": request.headers.get("host"),
+            "x-forwarded-proto": request.headers.get("x-forwarded-proto"),
+        }
+    }
+    
+    token = request.cookies.get("access_token")
+    if token:
+        result["token_starts_with_bearer"] = token.startswith("Bearer ")
+        if token.startswith("Bearer "):
+            token_value = token.replace("Bearer ", "")
+            try:
+                payload = jwt.decode(token_value, SECRET_KEY, algorithms=[ALGORITHM])
+                result["token_payload"] = payload
+                result["token_valid"] = True
+            except Exception as e:
+                result["token_error"] = str(e)
+                result["token_valid"] = False
+    
+    return result
+
 
 @app.get("/")
 async def home(request: Request):
     user = getattr(request.state, 'user', None)
+    print(f"Home - User: {user}")  # DEBUG
+    
     if not user:
+        print("Home - Pas d'utilisateur, redirection vers login")
         return RedirectResponse(url="/login", status_code=303)
     
+    print(f"Home - Utilisateur connecté: {user.username}")
     token = request.cookies.get("access_token")
     if token and token.startswith("Bearer "):
         token = token.replace("Bearer ", "")
@@ -245,7 +290,6 @@ async def home(request: Request):
             "ACCESS_TOKEN_EXPIRE_MINUTES": ACCESS_TOKEN_EXPIRE_MINUTES
         }
     )
-
 @app.get("/login")
 async def login_form(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
@@ -280,10 +324,12 @@ async def login(request: Request, db: Session = Depends(get_db)):
         response = RedirectResponse(url="/dashboard", status_code=303)
         
         response.set_cookie(
-            key="access_token", 
-            value=f"Bearer {access_token}", 
-            httponly=True,
-            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+              key="access_token", 
+              value=f"Bearer {access_token}", 
+              httponly=True,
+              max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+              secure=True,  # IMPORTANT pour HTTPS
+              xsamesite="lax"
         )
         
         return response
