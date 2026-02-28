@@ -1,0 +1,94 @@
+<!-- templates/includes/notifications.html -->
+{% set notification = get_notification(request) %}
+{% if notification %}
+<div class="notification notification-{{ notification.type }}" role="alert">
+    {{ notification.message }}
+    <button type="button" class="notification-close" onclick="this.parentElement.remove()">&times;</button>
+</div>
+
+<style>
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: slideIn 0.3s ease-out;
+    max-width: 400px;
+}
+
+.notification-success {
+    background-color: #28a745;
+    border-left: 4px solid #1e7e34;
+}
+
+.notification-error {
+    background-color: #dc3545;
+    border-left: 4px solid #bd2130;
+}
+
+.notification-warning {
+    background-color: #ffc107;
+    color: #212529;
+    border-left: 4px solid #d39e00;
+}
+
+.notification-info {
+    background-color: #17a2b8;
+    border-left: 4px solid #117a8b;
+}
+
+.notification-close {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 20px;
+    cursor: pointer;
+    float: right;
+    margin-left: 10px;
+    opacity: 0.8;
+}
+
+.notification-close:hover {
+    opacity: 1;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Auto-disparaît après 5 secondes */
+.notification {
+    animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-out 4.5s forwards;
+}
+
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+</style>
+
+<script>
+// Supprimer la notification après 5 secondes
+setTimeout(() => {
+    const notification = document.querySelector('.notification');
+    if (notification) {
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 500);
+    }
+}, 5000);
+</script>
+{% endif %}

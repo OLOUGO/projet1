@@ -117,15 +117,9 @@ function copyToken() {
         </div>
     </nav>
 
-    <!-- Messages flash (optionnel) -->
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.category }} alert-dismissible fade show m-3" role="alert">
-                {{ message.text }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        {% endfor %}
-    {% endif %}
+     <!-- INCLURE LES NOTIFICATIONS ICI -->
+    {% include "includes/notifications.html" %}
+    
 
     <!-- Contenu principal -->
     <main class="container my-4">
