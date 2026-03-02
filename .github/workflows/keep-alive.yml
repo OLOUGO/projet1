@@ -1,0 +1,45 @@
+name: Render Keep-Alive Ping
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # Toutes les 10 minutes
+  workflow_dispatch:  # Permet le déclenchement manuel
+
+jobs:
+  ping_render:
+    name: Keep Render awake
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check current time
+        run: echo "Pinging at $(date)"
+      
+      - name: Ping health endpoint
+        id: ping
+        run: |
+          URL="https://projet1-neyj.onrender.com/healthz"
+          echo "Sending request to ${URL}"
+          
+          # Mesurer le temps de réponse
+          START_TIME=$(date +%s%N)
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}")
+          END_TIME=$(date +%s%N)
+          DURATION=$(( ($END_TIME - $START_TIME) / 1000000 ))
+          
+          echo "status=${HTTP_STATUS}" >> $GITHUB_OUTPUT
+          echo "duration=${DURATION}ms" >> $GITHUB_OUTPUT
+          
+          echo "Response time: ${DURATION}ms"
+      
+      - name: Check response status
+        if: steps.ping.outputs.status != '200'
+        run: |
+          echo "⚠️ Warning: Received status ${{ steps.ping.outputs.status }}"
+          echo "Response time: ${{ steps.ping.outputs.duration }}"
+      
+      - name: Log success
+        if: steps.ping.outputs.status == '200'
+        run: |
+          echo "✅ Success! Status 200 OK"
+          echo "⏱️  Response time: ${{ steps.ping.outputs.duration }}"
+          
